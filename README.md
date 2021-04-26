@@ -1,4 +1,4 @@
-# More-than-an-increase-in-sea-levels-The-impact-of-climate-change-on-mental-illness-prevalence
+# The-impact-of-climate-change-on-mental-illness-prevalence
 This code was used for the article "More than an increase in sea levels: The impact of climate change on mental illness prevalence" 
 
 Purpose: The looming repercussions of climate change threaten the population with an increased prevalence of high-intensity extreme climate events. 
