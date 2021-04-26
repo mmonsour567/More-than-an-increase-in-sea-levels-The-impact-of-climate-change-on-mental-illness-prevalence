@@ -1,0 +1,646 @@
+---
+title: "Manuscript_Code"
+author: "Molly Monsour"
+date: "4/10/2021"
+output: html_document
+---
+```{r setup, include=FALSE}
+library(dplyr)
+library(mice)
+library(ggplot2)
+library(tidyverse)
+library(caret)
+library(leaps)
+library(MASS)
+library(ggeffects)
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("dplyr")
+library(metafor)
+library(robumeta)
+#install.packages("TH.data")
+#BiocManager::install("multtest")
+#install.packages("metap")
+library(metap)
+library(Hmisc)
+```
+#TC Sandy Imputation
+The following code was used for TC Sandy imputation.
+Sandy column names: age_cat, male, hispanic, black, anx_hurr, anx_life, mddl, mdd_hurr, ptsdl, ptsd_hurr, Disp_Num_Days, alc_inc, Hurr_Exp_Ct, health, hurr_exp
+
+```{r}
+set.seed(145)
+```
+
+```{r}
+#Import data for Sandy dataset
+Sandydata <- read.csv("INSERT PATHWAY TO SANDY DATA CSV", header = TRUE, sep = ",", na.strings=c(""))
+```
+
+```{r}
+#Scale necessary variables for Sandy dataset and then turn them into numeric forms for further analysis
+Sandydata$scaled_health<-scale(Sandydata$health)
+Sandydata$scaled_health<-as.numeric(Sandydata$scaled_health)
+Sandydata$scaled_dispdays<-scale(Sandydata$Disp_Num_Days)
+Sandydata$scaled_dispdays<-as.numeric(Sandydata$scaled_dispdays)
+```
+
+```{r}
+#Examine missing variabales for Sandy dataset
+md.pattern(Sandydata)
+#Examine fully imputed variabales for Sandy dataset
+#md.pattern(completeimp)
+```
+
+```{r}
+#Create new file to complete imputation with only necessary variables
+Sandydatanew<-Sandydata %>%
+  dplyr::select(-ID,-health,-Disp_Num_Days, -alc_inc,-Hurr_Exp_Ct)
+```
+
+```{r}
+#change variables into numeric form for further analysis 
+Sandydatanew$age_cat<-as.numeric(Sandydatanew$age_cat)
+Sandydatanew$black<-as.numeric(Sandydatanew$black)
+Sandydatanew$hispanic<-as.numeric(Sandydatanew$hispanic)
+Sandydatanew$male<-as.numeric(Sandydatanew$male)
+Sandydatanew$ptsdl<-as.numeric(Sandydatanew$ptsdl)
+Sandydatanew$mddl<-as.numeric(Sandydatanew$mddl)
+Sandydatanew$scaled_health<-as.numeric(Sandydatanew$scaled_health)
+Sandydatanew$scaled_dispdays<-as.numeric(Sandydatanew$scaled_dispdays)
+Sandydatanew$anx_life<-as.numeric(Sandydatanew$anx_life)
+```
+
+```{r}
+imp <- mice(Sandydatanew, maxit=0)
+# Extract predictorMatrix and methods of imputation 
+predM = imp$predictorMatrix
+meth = imp$method
+
+# Setting values of variables to leave as 0 in the predictor matrix because they are dependent variables. Hurr_exp is not a dependent variable, but was calculated differently per site so would lead to a lot of heterogeneity if used for imputation.
+predM[, c("mdd_hurr")]=0
+predM[, c("anx_hurr")]=0
+predM[, c("ptsd_hurr")]=0
+predM[, c("hurr_exp")]=0
+head(predM)
+```
+
+```{r}
+#define variables as poly or log for mice function usage 
+poly <- c("age_cat","scaled_health", "scaled_dispdays")
+log <- c("black","hispanic","male","anx_life","mddl","ptsdl")
+
+meth[poly] = "polr"
+meth[log] = "logreg"
+
+meth
+```
+
+```{r}
+#Complete Sandy imputation
+imp2_Sandy <- mice(Sandydatanew, m = 5, 
+             predictorMatrix= predM, print=FALSE)
+print(imp2_Sandy$data)
+
+completeimp_Sandy<-complete(imp2_Sandy)
+```
+
+#TC Ike Imputation
+The following code was used for TC Ike imputation.
+Ike column names: ID, income_before, age_cat, male, hispanic, black, anx_hurr, anx_life, mddl, mdd_hurr, ptsdl, ptsd_hurr, num_prev_trauma, infosupport, emotionalsupport, Disp_Num_Days, alc_inc, Hurr_exp_ct, health, hurr_exp
+
+```{r}
+set.seed(145)
+```
+
+```{r}
+#Import data for Ike dataset
+Ikedata <- read.csv("INSERT PATH TO IKE DATA CSV", header = TRUE, sep = ",", na.strings=c(""))
+```
+
+```{r}
+#Scale necessary variables for Ike dataset and then turn them into numeric forms for further analysis
+Ikedata$scaled_income_before<-scale(Ikedata$income_before)
+Ikedata$scaled_income_before<-as.numeric(Ikedata$scaled_income_before)
+Ikedata$scaled_health<-scale(Ikedata$health)
+Ikedata$scaled_health<-as.numeric(Ikedata$scaled_health)
+Ikedata$scaled_emotionalsupport<-scale(Ikedata$emotionalsupport)
+Ikedata$scaled_emotionalsupport<-as.numeric(Ikedata$scaled_emotionalsupport)
+Ikedata$scaled_infosupport<-scale(Ikedata$infosupport)
+Ikedata$scaled_infosupport<-as.numeric(Ikedata$scaled_infosupport)
+Ikedata$scaled_numprevtrauma<-scale(Ikedata$num_prev_trauma)
+Ikedata$scaled_numprevtrauma<-as.numeric(Ikedata$scaled_numprevtrauma)
+Ikedata$scaled_dispdays<-scale(Ikedata$Disp_Num_Days)
+Ikedata$scaled_dispdays<-as.numeric(Ikedata$scaled_dispdays)
+```
+
+```{r}
+#Examine missing variabales for Ike dataset
+md.pattern(Ikedata)
+#Examine fully imputed variabales for Ike dataset
+#md.pattern(completeimp_Ike)
+```
+
+```{r}
+#Create new file to complete imputation with only necessary variables
+Ikedatanew<-Ikedata %>%
+  dplyr::select(-ID,-health,-emotionalsupport,-infosupport,-num_prev_trauma, -income_before,-Disp_Num_Days, -alc_inc,-Hurr_exp_ct)
+```
+
+```{r}
+#change variables into numeric form for further analysis 
+Ikedatanew$scaled_income_before<-as.numeric(Ikedatanew$scaled_income_before)
+Ikedatanew$age_cat<-as.numeric(Ikedatanew$age_cat)
+Ikedatanew$black<-as.numeric(Ikedatanew$black)
+Ikedatanew$hispanic<-as.numeric(Ikedatanew$hispanic)
+Ikedatanew$male<-as.numeric(Ikedatanew$male)
+Ikedatanew$ptsdl<-as.numeric(Ikedatanew$ptsdl)
+Ikedatanew$mddl<-as.numeric(Ikedatanew$mddl)
+Ikedatanew$scaled_health<-as.numeric(Ikedatanew$scaled_health)
+Ikedatanew$scaled_emotionalsupport<-as.numeric(Ikedatanew$scaled_emotionalsupport)
+Ikedatanew$scaled_numprevtrauma<-as.numeric(Ikedatanew$scaled_numprevtrauma)
+Ikedatanew$scaled_infosupport<-as.numeric(Ikedatanew$scaled_infosupport)
+Ikedatanew$hurr_exp<-as.numeric(Ikedatanew$hurr_exp)
+Ikedatanew$scaled_dispdays<-as.numeric(Ikedatanew$scaled_dispdays)
+Ikedatanew$anx_life<-as.numeric(Ikedatanew$anx_life)
+```
+
+```{r}
+imp <- mice(Ikedatanew, maxit=0)
+# Extract predictorMatrix and methods of imputation 
+predM = imp$predictorMatrix
+meth = imp$method
+
+# Setting values of variables to leave as 0 in the predictor matrix because they are dependent variables. Hurr_exp is not a dependent variable, but was calculated differently per site so would lead to a lot of heterogeneity if used for imputation.
+predM[, c("mdd_hurr")]=0
+predM[, c("anx_hurr")]=0
+predM[, c("ptsd_hurr")]=0
+predM[, c("hurr_exp")]=0
+head(predM)
+```
+
+```{r}
+#define variables as poly or log for mice function usage 
+poly <- c("age_cat","scaled_emotionalsupport","scaled_infosupport","scaled_health","scaled_numprevtrauma","scaled_income_before", "scaled_dispdays")
+log <- c("black","hispanic","male","anx_life","mddl","ptsdl")
+
+meth[poly] = "polr"
+meth[log] = "logreg"
+
+meth
+```
+
+```{r}
+# Complete Ike imputation
+imp2_Ike <- mice(Ikedatanew, m = 5, 
+             predictorMatrix= predM, print=FALSE)
+print(imp2_Ike$data)
+
+completeimp_Ike<-complete(imp2_Ike)
+print(completeimp_Ike)
+```
+
+#TC 2004 FL Imputation
+The following code was used for TC FL imputation.
+FL column names: ID, income_before, age_cat, anx_hurr, male, hispanic, black, mddl, mdd_hurr, ptsdl, ptsd_hurr, num_prev_trauma, infosupport, emotionalsupport, disp_num_days, alc_inc, hurr_exp_ct, health, hurr_exp
+
+```{r setup}
+set.seed(145)
+```
+
+```{r}
+#Import data for FL dataset
+FLdata <- read.csv("INSERT PATH FOR FL DATA CSV", header = TRUE, sep = ",", na.strings=c(""))
+```
+
+```{r}
+#Scale necessary variables for FL dataset and then turn them into numeric forms for further analysis
+FLdata$scaled_income_before<-scale(FLdata$income_before)
+FLdata$scaled_income_before<-as.numeric(FLdata$scaled_income_before)
+FLdata$health<-as.numeric(FLdata$health)
+FLdata$scaled_health<-scale(FLdata$health)
+FLdata$scaled_health<-as.numeric(FLdata$scaled_health)
+FLdata$scaled_emotionalsupport<-scale(FLdata$emotionalsupport)
+FLdata$scaled_emotionalsupport<-as.numeric(FLdata$scaled_emotionalsupport)
+FLdata$scaled_infosupport<-scale(FLdata$infosupport)
+FLdata$scaled_infosupport<-as.numeric(FLdata$scaled_infosupport)
+FLdata$scaled_numprevtrauma<-scale(FLdata$num_prev_trauma)
+FLdata$scaled_numprevtrauma<-as.numeric(FLdata$scaled_numprevtrauma)
+FLdata$scaled_dispdays<-scale(FLdata$disp_num_days)
+FLdata$scaled_dispdays<-as.numeric(FLdata$scaled_dispdays)
+```
+
+```{r}
+#Examine missing variabales for FL dataset
+md.pattern(FLdata)
+#Examine fully imputed variabales for FL dataset
+#md.pattern(completeimp_FL)
+```
+
+```{r}
+#Create new file to complete imputation with only necessary variables
+FLdatanew<-FLdata %>%
+  dplyr::select(-ID,-health,-emotionalsupport,-infosupport,-num_prev_trauma, -income_before,-disp_num_days, -alc_inc,-hurr_exp_ct)
+```
+
+```{r}
+#change variables into numeric form for further analysis
+FLdatanew$scaled_income_before<-as.numeric(FLdatanew$scaled_income_before)
+FLdatanew$age_cat<-as.numeric(FLdatanew$age_cat)
+FLdatanew$black<-as.numeric(FLdatanew$black)
+FLdatanew$hispanic<-as.numeric(FLdatanew$hispanic)
+FLdatanew$male<-as.numeric(FLdatanew$male)
+FLdatanew$ptsdl<-as.numeric(FLdatanew$ptsdl)
+FLdatanew$mddl<-as.numeric(FLdatanew$mddl)
+FLdatanew$scaled_health<-as.numeric(FLdatanew$scaled_health)
+FLdatanew$scaled_emotionalsupport<-as.numeric(FLdatanew$scaled_emotionalsupport)
+FLdatanew$scaled_numprevtrauma<-as.numeric(FLdatanew$scaled_numprevtrauma)
+FLdatanew$scaled_infosupport<-as.numeric(FLdatanew$scaled_infosupport)
+FLdatanew$hurr_exp<-as.numeric(FLdatanew$hurr_exp)
+FLdatanew$scaled_dispdays<-as.numeric(FLdatanew$scaled_dispdays)
+```
+
+```{r}
+imp <- mice(FLdatanew, maxit=0)
+# Extract predictorMatrix and methods of imputation 
+predM = imp$predictorMatrix
+meth = imp$method
+
+# Setting values of variables to leave as 0 in the predictor matrix because they are dependent variables. Hurr_exp is not a dependent variable, but was calculated differently per site so would lead to a lot of heterogeneity if used for imputation.
+predM[, c("mdd_hurr")]=0
+predM[, c("anx_hurr")]=0
+predM[, c("ptsd_hurr")]=0
+predM[, c("hurr_exp")]=0
+head(predM)
+```
+
+```{r}
+#define variables as poly or log for mice function usage 
+poly <- c("age_cat","scaled_emotionalsupport","scaled_infosupport","scaled_health","scaled_numprevtrauma","scaled_income_before", "scaled_dispdays")
+log <- c("black","hispanic","male","mddl","ptsdl")
+
+meth[poly] = "polr"
+meth[log] = "logreg"
+
+meth
+```
+
+```{r}
+# Complete FL imputation
+imp2_FL <- mice(FLdatanew, m = 5, 
+             predictorMatrix= predM, print=FALSE)
+print(imp2_FL$data)
+
+completeimp_FL<-complete(imp2_FL)
+print(completeimp_FL)
+```
+
+#TC Sandy 
+The following code was used for TC Sandy glm(mental illness~.) including multiple variables.
+
+```{r}
+#Full model creates a logistic regression model to predict TC induced depression risk considering all variables in imputed dataset, TC exposure score, and TC exposure interacting with race and ethnicity. Step model simplifies glm.
+fullmodeldep_Sandy<-glm(mdd_hurr~ male+scaled_dispdays+scaled_health+black+hispanic+age_cat+anx_life+mddl+ptsdl+hurr_exp+hurr_exp:black+hurr_exp:hispanic, family="binomial", data=completeimp_Sandy)
+stepmodeldep_Sandy<-step(fullmodeldep_Sandy, direction="both", trace=FALSE)
+summary(stepmodeldep_Sandy)
+results_depSandy <-summary.glm(stepmodeldep_Sandy)$coefficients
+write.csv(results_depSandy, "stepSandymdd.csv")
+```
+
+```{r}
+#Full model creates a logistic regression model to predict TC induced PTSD risk considering all variables in imputed dataset, TC exposure score, and TC exposure interacting with race and ethnicity. Step model simplifies glm.
+fullmodelptsd_Sandy<-glm(ptsd_hurr ~ male+scaled_dispdays+scaled_health+black+hispanic+age_cat+anx_life+mddl+ptsdl+hurr_exp+hurr_exp:black+hurr_exp:hispanic, family="binomial", data=completeimp_Sandy)
+stepmodelptsd_Sandy<-step(fullmodelptsd_Sandy, direction="both", trace=FALSE)
+summary(stepmodelptsd_Sandy)
+results_ptsdSandy <-summary.glm(stepmodelptsd_Sandy)$coefficients
+write.csv(results_ptsdSandy, "stepSandyptsd.csv")
+```
+
+```{r}
+#Full model creates a logistic regression model to predict TC induced anxiety risk considering all variables in imputed dataset, TC exposure score, and TC exposure interacting with race and ethnicity. Step model simplifies glm.
+fullmodelanx_Sandy<-glm(anx_hurr ~ male+scaled_dispdays+scaled_health+black+hispanic+age_cat+anx_life+mddl+ptsdl+hurr_exp+hurr_exp:black+hurr_exp:hispanic, family=binomial(link=logit), data=completeimp_Sandy)
+stepmodelanx_Sandy<-step(fullmodelanx_Sandy, direction="both", trace=FALSE)
+summary(stepmodelanx_Sandy)
+results_anxSandy <-summary.glm(stepmodelanx_Sandy)$coefficients
+write.csv(results_anxSandy, "stepSandyanx.csv")
+```
+
+```{r}
+#Creates predictions for mental illness risk based on TC exposure score Beta values from full model. These graphs were not included in the paper.
+anxgraph_Sandy<-ggpredict(stepmodelanx_Sandy, terms = c("hurr_exp[all]"))
+ptsdgraph_Sandy<-ggpredict(stepmodelptsd_Sandy, terms = c("hurr_exp[all]"))
+mddgraph_Sandy<-ggpredict(stepmodeldep_Sandy, terms = c("hurr_exp[all]"))
+```
+
+```{r}
+#Graphs predicted values and styling graphs as made in previous code chunk
+anxplot_Sandy<-plot(anxgraph_Sandy, color = 'bw')
+ptsdplot_Sandy<-plot(ptsdgraph_Sandy, color = 'bw')
+mddplot_Sandy<-plot(mddgraph_Sandy, color = 'bw')
+
+mynamestheme <- theme(plot.title = element_text(family = "Arial", face = "bold", size = (15)), 
+                 legend.title = element_text(colour = "darkred",  face = "bold.italic", family = "Helvetica"), 
+                 legend.text = element_text(face = "italic", colour="purple",family = "Helvetica"), 
+                  axis.title = element_text(family = "Arial", size = (10), colour = "pink"),
+                  axis.text = element_text(family = "Arial", colour = "purple", size = (10)))
+print(anxplot_Sandy + mynamestheme + ggtitle("Risk of Anxiety") + labs(y="Anxiety probability", x="TC_exp"))
+print(ptsdplot_Sandy + mynamestheme + ggtitle("Risk of PTSD") + labs(y="PTSD probability", x="TC_exp"))
+print(mddplot_Sandy + mynamestheme + ggtitle("Risk of MDD") + labs(y="MDD probability", x="TC_exp"))
+```
+
+#TC Ike 
+The following code was used for TC Ike glm(mental illness~.) including multiple variables.
+
+```{r}
+##Full model creates a logistic regression model to predict TC induced depression risk considering all variables in imputed dataset, TC exposure score, and TC exposure interacting with income, race and ethnicity. Step model simplifies glm.
+fullmodeldep_Ike<-glm(mdd_hurr~ male+scaled_income_before+scaled_infosupport+scaled_dispdays+scaled_numprevtrauma+scaled_emotionalsupport+scaled_health+black+hispanic+age_cat+anx_life+mddl+ptsdl+hurr_exp+hurr_exp:scaled_income_before+hurr_exp:black+hurr_exp:hispanic, family="binomial", data=completeimp_Ike)
+stepmodeldep_Ike<-step(fullmodeldep_Ike, direction="both", trace=FALSE)
+summary(stepmodeldep_Ike)
+results_depIke <-summary.glm(stepmodeldep_Ike)$coefficients
+write.csv(results_depIke, "stepIkemdd.csv")
+```
+
+```{r}
+#Full model creates a logistic regression model to predict TC induced anxiety risk considering all variables in imputed dataset, TC exposure score, and TC exposure interacting with income, race and ethnicity. Step model simplifies glm.
+fullmodelanx_Ike<-glm(anx_hurr ~ male+scaled_income_before+scaled_infosupport+scaled_dispdays+scaled_numprevtrauma+scaled_emotionalsupport+scaled_health+black+hispanic+age_cat+anx_life+mddl+ptsdl+hurr_exp+hurr_exp:scaled_income_before+hurr_exp:black+hurr_exp:hispanic, family="binomial", data=completeimp_Ike)
+stepmodelanx_Ike<-step(fullmodelanx_Ike, direction="both", trace=FALSE)
+summary(stepmodelanx_Ike)
+results_anxIke <-summary.glm(stepmodelanx_Ike)$coefficients
+write.csv(results_anxIke, "stepIkeanx.csv")
+```
+
+```{r}
+#Full model creates a logistic regression model to predict TC induced PTSD risk considering all variables in imputed dataset, TC exposure score, and TC exposure interacting with income, race and ethnicity. Step model simplifies glm.
+fullmodelptsd_Ike<-glm(ptsd_hurr ~ male+scaled_income_before+scaled_infosupport+scaled_dispdays+scaled_numprevtrauma+scaled_emotionalsupport+scaled_health+black+hispanic+age_cat+anx_life+mddl+ptsdl+hurr_exp+hurr_exp:scaled_income_before+hurr_exp:black+hurr_exp:hispanic, family=binomial, data=completeimp_Ike)
+stepmodelptsd_Ike<-step(fullmodelptsd_Ike, direction="both", trace=FALSE)
+summary(stepmodelptsd_Ike)
+results_ptsdIke <-summary.glm(stepmodelptsd_Ike)$coefficients
+write.csv(results_ptsdIke, "stepIkeptsd.csv")
+```
+
+```{r}
+#Creates predictions for mental illness risk based on TC exposure score Beta values from the full model. These graphs were not included in the paper.
+anxgraph_Ike<-ggpredict(fullmodelanx_Ike, terms = c("hurr_exp[all]"))
+ptsdgraph_Ike<-ggpredict(fullmodelptsd_Ike, terms = c("hurr_exp[all]"))
+mddgraph_Ike<-ggpredict(fullmodeldep_Ike, terms = c("hurr_exp[all]"))
+```
+
+```{r}
+#Graphs predicted values and styling graphs as made in previous code chunk
+anxplot_Ike<-plot(anxgraph_Ike, color = 'bw')
+ptsdplot_Ike<-plot(ptsdgraph_Ike, color = 'bw')
+mddplot_Ike<-plot(mddgraph_Ike, color = 'bw')
+
+mynamestheme <- theme(plot.title = element_text(family = "Arial", face = "bold", size = (15)), 
+                 legend.title = element_text(colour = "darkred",  face = "bold.italic", family = "Helvetica"), 
+                 legend.text = element_text(face = "italic", colour="purple",family = "Helvetica"), 
+                  axis.title = element_text(family = "Arial", size = (10), colour = "pink"),
+                  axis.text = element_text(family = "Arial", colour = "purple", size = (10)))
+print(ptsdplot_Ike + mynamestheme + ggtitle("Risk of PTSD") + labs(y="PTSD probability", x="TC_exp"))
+print(anxplot_Ike + mynamestheme + ggtitle("Risk of anxiety") + labs(y="anxiety probability", x="TC_exp"))
+print(mddplot_Ike + mynamestheme + ggtitle("Risk of MDD") + labs(y="MDD probability", x="TC_exp"))
+```
+
+#TC 2004 FL
+The following code was used for 2004 FL glm(mental illness~.) including multiple variables.
+
+```{r}
+#Full model creates a logistic regression model to predict TC induced depression risk considering all variables in imputed dataset, TC exposure score, and TC exposure interacting with income, race and ethnicity. Step model simplifies glm.
+fullmodeldep_FL<-glm(mdd_hurr~ male+scaled_income_before+scaled_infosupport+scaled_dispdays+scaled_numprevtrauma+scaled_emotionalsupport+scaled_health+black+hispanic+age_cat+mddl+ptsdl+hurr_exp+hurr_exp:scaled_income_before+hurr_exp:black+hurr_exp:hispanic, family="binomial", data=completeimp_FL)
+stepmodeldep_FL<-step(fullmodeldep_FL, direction="both", trace=FALSE)
+summary(stepmodeldep_FL)
+results_mddFL <-summary.glm(stepmodeldep_FL)$coefficients
+write.csv(results_mddFL, "stepFLmdd.csv")
+```
+
+```{r}
+#Full model creates a logistic regression model to predict TC induced anxiety risk considering all variables in imputed dataset, TC exposure score, and TC exposure interacting with income, race and ethnicity. Step model simplifies glm.
+fullmodelanx_FL<-glm(anx_hurr ~ male+scaled_income_before+scaled_infosupport+scaled_dispdays+scaled_numprevtrauma+scaled_emotionalsupport+scaled_health+black+hispanic+age_cat+mddl+ptsdl+hurr_exp+hurr_exp:scaled_income_before+hurr_exp:black+hurr_exp:hispanic, family="binomial", data=completeimp_FL)
+stepmodelanx_FL<-step(fullmodelanx_FL, direction="both", trace=FALSE)
+summary(stepmodelanx_FL)
+results_anxFL <-summary.glm(stepmodelanx_FL)$coefficients
+write.csv(results_anxFL, "stepFLanx.csv")
+```
+
+```{r}
+#Full model creates a logistic regression model to predict TC induced PTSD risk considering all variables in imputed dataset, TC exposure score, and TC exposure interacting with income, race and ethnicity. Step model simplifies glm.
+fullmodelptsd_FL<-glm(ptsd_hurr ~ male+scaled_income_before+scaled_infosupport+scaled_dispdays+scaled_numprevtrauma+scaled_emotionalsupport+scaled_health+black+hispanic+age_cat+mddl+ptsdl+hurr_exp+hurr_exp:scaled_income_before+hurr_exp:black+hurr_exp:hispanic, family=binomial, data=completeimp_FL)
+stepmodelptsd_FL<-step(fullmodelptsd_FL, direction="both", trace=FALSE)
+summary(stepmodelptsd_FL)
+results_ptsdFL <-summary.glm(stepmodelptsd_FL)$coefficients
+write.csv(results_ptsdFL, "stepFLptsd.csv")
+```
+
+```{r}
+#Creates predictions for mental illness risk based on TC exposure score Beta values from full model. These graphs were not included in the paper.
+anxgraph_FL<-ggpredict(fullmodelanx_FL, terms = c("hurr_exp[all]"))
+ptsdgraph_FL<-ggpredict(fullmodelptsd_FL, terms = c("hurr_exp[all]"))
+mddgraph_FL<-ggpredict(fullmodeldep_FL, terms = c("hurr_exp[all]"))
+```
+
+```{r}
+#Graphs predicted values and styling graphs as made in previous code chunk
+ptsdplot_FL<-plot(ptsdgraph_FL, color = 'bw')
+anxplot_FL<-plot(anxgraph_FL, color = 'bw')
+mddplot_FL<-plot(mddgraph_FL, color = 'bw')
+
+mynamestheme <- theme(plot.title = element_text(family = "Arial", face = "bold", size = (15)), 
+                 legend.title = element_text(colour = "darkred",  face = "bold.italic", family = "Helvetica"), 
+                 legend.text = element_text(face = "italic", colour="purple",family = "Helvetica"), 
+                  axis.title = element_text(family = "Arial", size = (10), colour = "pink"),
+                  axis.text = element_text(family = "Arial", colour = "purple", size = (10)))
+print(ptsdplot_FL + mynamestheme + ggtitle("Risk of PTSD") + labs(y="PTSD probability", x="TC_exp"))
+print(anxplot_FL + mynamestheme + ggtitle("Risk of anxiety") + labs(y="anxiety probability", x="TC_exp"))
+print(mddplot_FL + mynamestheme + ggtitle("Risk of MDD") + labs(y="MDD probability", x="TC_exp"))
+```
+#Interaction between income, TC Exposure Score, and mental illness risk
+The following code illustrates how as TC Exposure increases, the impact of income on mental illness risk also increases.
+```{r}
+#Develops graphs to show the unexpected interaction between income, TC Exposure Score, and mental illness risk for sites where this interaction was significant
+FLanx_interaction<-ggpredict(stepmodelanx_FL, terms=c( 'hurr_exp[all]', 'scaled_income_before[MIN VAL, MAX VAL]'))
+FLanx_interaction_graph<-plot(FLanx_interaction, ci=FALSE, color = 'bw')
+
+Ikeanx_interaction<-ggpredict(stepmodelanx_Ike, terms=c('hurr_exp[all]', 'scaled_income_before[MIN VAL, MAX VAL]'))
+Ikeanx_interaction_graph<-plot(Ikeanx_interaction,ci = FALSE, color = 'bw')
+
+mynamestheme <- theme(plot.title = element_text(family = "Arial", face = "bold", size = (15)), 
+                 legend.title = element_text(colour = "navy",  face = "bold.italic", family = "Helvetica"), 
+                 legend.text = element_text(face = "italic", colour="blue",family = "Helvetica"), 
+                  axis.title = element_text(family = "Arial", size = (15), colour = "navy"),
+                  axis.text = element_text(family = "Arial", colour = "blue", size = (15)))
+print(Ikeanx_interaction_graph + mynamestheme + ggtitle("Income interaction for TC-induced Anxiety after TC Ike") + labs(y="Anxiety Probability", x="TC Exposure"))
+print(FLanx_interaction_graph + mynamestheme + ggtitle("Income interaction for TC-induced Anxiety after FL TCs") + labs(y="Anxiety probability", x="TC Exposure"))
+```
+```
+
+#TC Exposure glm
+The following code was used for each sites glm(mental illness~TC Exposure Score) and graphs.
+
+```{r}
+#Uses imputed dataset to determine how TC exposure relates to depression risk without considering all other variables. Also writes a CSV with p-values for site which should later be combined with other site's MDD ~ TC Exposure p-values for meanz() analysis. 
+he_dep_FL<-glm(mdd_hurr~ hurr_exp, family="binomial", data=completeimp_FL)
+results_he_dep_FL <-summary.glm(he_dep_FL)$coefficients
+write.csv(results_he_dep_FL, "he_depFL.csv")
+summary(he_dep_FL)
+```
+
+```{r}
+#Uses imputed dataset to determine how TC exposure relates to anxiety risk without considering all other variables. Also writes a CSV with p-values for site which should later be combined with other site's Anxiety ~ TC Exposure p-values for meanz() analysis. 
+he_anx_FL<-glm(anx_hurr~ hurr_exp, family="binomial", data=completeimp_FL)
+results_he_anx_FL <-summary.glm(he_anx_FL)$coefficients
+write.csv(results_he_anx_FL, "he_anxFL.csv")
+summary(he_anx_FL)
+```
+
+```{r}
+#Uses imputed dataset to determine how TC exposure relates to PTSD risk without considering all other variables. Also writes a CSV with p-values for site which should later be combined with other site's PTSD ~ TC Exposure p-values for meanz() analysis. 
+he_ptsd_FL<-glm(ptsd_hurr~ hurr_exp, family="binomial", data=completeimp_FL)
+results_he_PTSD_FL <-summary.glm(he_ptsd_FL)$coefficients
+write.csv(results_he_PTSD_FL, "he_PTSDFL.csv")
+summary(he_ptsd_FL)
+```
+
+```{r}
+#Predicts mental illness risk from mental illness ~ TC Exposure glm beta values
+mddgraph_FL<-ggpredict(he_dep_FL, terms = c("hurr_exp[all]"))
+anxgraph_FL<-ggpredict(he_anx_FL, terms = c("hurr_exp[all]"))
+ptsdgraph_FL<-ggpredict(he_ptsd_FL, terms = c("hurr_exp[all]"))
+```
+
+```{r}
+#Makes graphs for mental illness ~ TC Exposure based on predictions from previous code chunk
+anxplot_FL<-plot(anxgraph_FL, color = 'bw')
+ptsdplot_FL<-plot(ptsdgraph_FL, color = 'bw')
+mddplot_FL<-plot(mddgraph_FL, color = 'bw')
+
+mynamestheme <- theme(plot.title = element_text(family = "Arial", face = "bold", size = (20)), 
+                 legend.title = element_text(colour = "darkred",  face = "bold.italic", family = "Helvetica"), 
+                 legend.text = element_text(face = "italic", colour="blue",family = "Helvetica"), 
+                  axis.title = element_text(family = "Arial", size = (15), colour = "navy"),
+                  axis.text = element_text(family = "Arial", colour = "blue", size = (15)))
+print(ptsdplot_FL + mynamestheme + ggtitle("Risk of PTSD") + labs(y="PTSD probability", x="TC Exposure"))
+print(anxplot_FL + mynamestheme + ggtitle("Risk of anxiety") + labs(y="anxiety probability", x="TC Exposure"))
+print(mddplot_FL + mynamestheme + ggtitle("Risk of MDD") + labs(y="MDD probability", x="TC Exposure"))
+```
+
+```{r}
+#Uses imputed dataset to determine how TC exposure relates to depression risk without considering all other variables. Also writes a CSV with p-values for site which should later be combined with other site's MDD ~ TC Exposure p-values for meanz() analysis. 
+he_dep_Ike<-glm(mdd_hurr~ hurr_exp, family="binomial", data=completeimp_Ike)
+results_he_dep_Ike <-summary.glm(he_dep_Ike)$coefficients
+write.csv(results_he_dep_Ike, "he_depIke.csv")
+summary(he_dep_Ike)
+```
+
+```{r}
+#Uses imputed dataset to determine how TC exposure relates to anxiety risk without considering all other variables. Also writes a CSV with p-values for site which should later be combined with other site's Anxiety ~ TC Exposure p-values for meanz() analysis. 
+he_anx_Ike<-glm(anx_hurr~ hurr_exp, family="binomial", data=completeimp_Ike)
+results_he_anx_Ike <-summary.glm(he_anx_Ike)$coefficients
+write.csv(results_he_anx_Ike, "he_anxIke.csv")
+summary(he_anx_Ike)
+```
+
+```{r}
+#Uses imputed dataset to determine how TC exposure relates to PTSD risk without considering all other variables. Also writes a CSV with p-values for site which should later be combined with other site's PTSD ~ TC Exposure p-values for meanz() analysis. 
+he_ptsd_Ike<-glm(ptsd_hurr~ hurr_exp, family="binomial", data=completeimp_Ike)
+results_he_ptsd_Ike <-summary.glm(he_ptsd_Ike)$coefficients
+write.csv(results_he_ptsd_Ike, "he_ptsdIke.csv")
+summary(he_ptsd_Ike)
+```
+
+```{r}
+#Predicts mental illness risk from mental illness ~ TC Exposure glm beta values
+mddgraph_Ike<-ggpredict(he_dep_Ike, terms = c("hurr_exp[all]"))
+anxgraph_Ike<-ggpredict(he_anx_Ike, terms = c("hurr_exp[all]"))
+ptsdgraph_Ike<-ggpredict(he_ptsd_Ike, terms = c("hurr_exp[all]"))
+```
+
+```{r}
+#Makes graphs for mental illness ~ TC Exposure based on predictions from previous code chunk
+ptsdplot_Ike<-plot(ptsdgraph_Ike, color = 'bw')
+anxplot_Ike<-plot(anxgraph_Ike, color = 'bw')
+mddplot_Ike<-plot(mddgraph_Ike, color = 'bw')
+
+mynamestheme <- theme(legend.text = element_text(face = "italic", colour="blue",family = "Helvetica"), 
+                  axis.title = element_text(family = "Arial", size = (15), colour = "navy"),
+                  axis.text = element_text(family = "Arial", colour = "blue", size = (15)))
+print(ptsdplot_Ike + mynamestheme + ggtitle("") + labs(y="PTSD probability", x="TC Exposure"))
+print(anxplot_Ike + mynamestheme + ggtitle("") + labs(y="anxiety probability", x="TC Exposure"))
+print(mddplot_Ike + mynamestheme + ggtitle("") + labs(y="MDD probability", x="TC Exposure"))
+```
+
+```{r}
+#Uses imputed dataset to determine how TC exposure relates to depression risk without considering all other variables. Also writes a CSV with p-values for site which should later be combined with other site's MDD ~ TC Exposure p-values for meanz() analysis. 
+he_dep_Sandy<-glm(mdd_hurr~ hurr_exp, family="binomial", data=completeimp_Sandy)
+results_he_dep_Sandy <-summary.glm(he_dep_Sandy)$coefficients
+write.csv(results_he_dep_Sandy, "he_depSandy.csv")
+summary(he_dep_Sandy)
+```
+
+```{r}
+#Uses imputed dataset to determine how TC exposure relates to anxiety risk without considering all other variables. Also writes a CSV with p-values for site which should later be combined with other site's Anxiety ~ TC Exposure p-values for meanz() analysis. 
+he_anx_Sandy<-glm(anx_hurr~ hurr_exp, family="binomial", data=completeimp_Sandy)
+results_he_anx_Sandy <-summary.glm(he_anx_Sandy)$coefficients
+write.csv(results_he_anx_Sandy, "he_anxSandy.csv")
+summary(he_anx_Sandy)
+```
+
+```{r}
+#Uses imputed dataset to determine how TC exposure relates to PTSD risk without considering all other variables. Also writes a CSV with p-values for site which should later be combined with other site's PTSD ~ TC Exposure p-values for meanz() analysis. 
+he_ptsd_Sandy<-glm(ptsd_hurr~ hurr_exp, family="binomial", data=completeimp_Sandy)
+results_he_ptsd_Sandy <-summary.glm(he_ptsd_Sandy)$coefficients
+write.csv(results_he_ptsd_Sandy, "he_ptsdSandy.csv")
+summary(he_ptsd_Sandy)
+```
+
+```{r}
+#Predicts mental illness risk from mental illness ~ TC Exposure glm beta values
+mddgraph_Sandy<-ggpredict(he_dep_Sandy, terms = c("hurr_exp[all]"))
+anxgraph_Sandy<-ggpredict(he_anx_Sandy, terms = c("hurr_exp[all]"))
+ptsdgraph_Sandy<-ggpredict(he_ptsd_Sandy, terms = c("hurr_exp[all]"))
+```
+
+```{r}
+#Makes graphs for mental illness ~ TC Exposure based on predictions from previous code chunk
+anxplot_Sandy<-plot(anxgraph_Sandy, color = 'bw')
+ptsdplot_Sandy<-plot(ptsdgraph_Sandy, color = 'bw')
+mddplot_Sandy<-plot(mddgraph_Sandy, color = 'bw')
+
+mynamestheme <- theme(plot.title = element_text(family = "Arial", face = "bold", size = (15)), 
+                 legend.title = element_text(colour = "darkred",  face = "bold.italic", family = "Helvetica"), 
+                 legend.text = element_text(face = "italic", colour="blue",family = "Helvetica"), 
+                  axis.title = element_text(family = "Arial", size = (15), colour = "navy"),
+                  axis.text = element_text(family = "Arial", colour = "blue", size = (15)))
+print(ptsdplot_Sandy + mynamestheme + ggtitle("") + labs(y="PTSD probability", x="TC Exposure"))
+print(anxplot_Sandy + mynamestheme + ggtitle("") + labs(y="anxiety probability", x="TC Exposure"))
+print(mddplot_Sandy + mynamestheme + ggtitle("") + labs(y="MDD probability", x="TC Exposure"))
+```
+
+#TC Exposure meanz()
+The following code was used for combining the beta values for glm(mental illness~TC Exposure Score) with meanz.
+
+```{r}
+#Imports the datasets for each mental illness including site-specific beta values for mental illness ~ TC Exposure Score
+he_mdd <- read.csv("COMBINE EACH SITE BETA VALUES FOR DEPRESSION~TC EXP INTO ONE CSV", header = TRUE, sep = ",", na.strings=c(""))
+he_ptsd <- read.csv("COMBINE EACH SITE BETA VALUES FOR PTSD~TC EXP INTO ONE CSV", header = TRUE, sep = ",", na.strings=c(""))
+he_anx <- read.csv("COMBINE EACH SITE BETA VALUES FOR ANXIETY~TC EXP INTO ONE CSV", header = TRUE, sep = ",", na.strings=c(""))
+```
+
+```{r}
+#Combines the z-scores from each site specific to anxiety to determine risk of anxiety as a result of TC exposure regardless of site
+combined_TCExp_Anx <- meanz(he_anx$Pr...z..)
+combined_TCExp_Anx
+```
+
+```{r}
+#Combines the z-scores from each site specific to MDD to determine risk of MDD as a result of TC exposure regardless of site
+combined_TCExp_MDD <- meanz(he_mdd$Pr...z..)
+combined_TCExp_MDD
+```
+
+```{r}
+#Combines the z-scores from each site specific to PTSD to determine risk of PTSD as a result of TC exposure regardless of site
+combined_TCExp_PTSD <- meanz(he_ptsd$Pr...z..)
+combined_TCExp_PTSD
+```
+
+
+
